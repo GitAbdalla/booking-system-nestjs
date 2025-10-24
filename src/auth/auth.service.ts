@@ -6,8 +6,9 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config'; // 1. Import ConfigService
 import * as bcrypt from 'bcrypt';
-import { User } from '../users/user.entity';
+import { User, UserRole } from '../users/user.entity';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -17,12 +18,14 @@ export class AuthService {
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private jwtService: JwtService,
+    private configService: ConfigService,
   ) {}
 
-  async register(registerDto: RegisterDto): Promise<{ accessToken: string; user: Partial<User> }> {
+  async register(
+    registerDto: RegisterDto,
+  ): Promise<{ accessToken: string; user: Partial<User> }> {
     const { email, password } = registerDto;
 
-    
     const existingUser = await this.userRepository.findOne({
       where: { email },
     });
@@ -31,23 +34,26 @@ export class AuthService {
       throw new ConflictException('Email already exists');
     }
 
-    
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
+
+    
+    const userRole =
+      email === this.configService.get<string>('ADMIN_EMAIL')
+        ? UserRole.ADMIN
+        : UserRole.USER;
 
     
     const user = this.userRepository.create({
       email,
       password: hashedPassword,
-      credits: 10, 
+      credits: userRole === UserRole.ADMIN ? 9999 : 10, 
+      role: userRole, 
     });
 
     await this.userRepository.save(user);
 
-    
     const accessToken = this.generateToken(user);
-
-    
     const { password: _, ...userWithoutPassword } = user;
 
     return {
@@ -56,29 +62,23 @@ export class AuthService {
     };
   }
 
-  async login(loginDto: LoginDto): Promise<{ accessToken: string; user: Partial<User> }> {
+  
+  async login(
+    loginDto: LoginDto,
+  ): Promise<{ accessToken: string; user: Partial<User> }> {
     const { email, password } = loginDto;
-
-    
-    const user = await this.userRepository.findOne({
-      where: { email },
-    });
+    const user = await this.userRepository.findOne({ where: { email } });
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    
     const isPasswordValid = await bcrypt.compare(password, user.password);
-
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-   
     const accessToken = this.generateToken(user);
-
-    
     const { password: _, ...userWithoutPassword } = user;
 
     return {
@@ -91,12 +91,13 @@ export class AuthService {
     const payload = {
       sub: user.id,
       email: user.email,
+      role: user.role, 
     };
-
     return this.jwtService.sign(payload);
   }
 
   async validateUser(userId: string): Promise<User> {
+    
     return this.userRepository.findOne({
       where: { id: userId },
     });

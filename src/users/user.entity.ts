@@ -9,6 +9,11 @@ import {
 import { Exclude } from 'class-transformer';
 import { Booking } from '../bookings/booking.entity';
 
+export enum UserRole {
+  USER = 'user',
+  ADMIN = 'admin',
+}
+
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
@@ -18,8 +23,15 @@ export class User {
   email: string;
 
   @Column()
-  @Exclude() 
+  @Exclude()
   password: string;
+
+  @Column({
+    type: 'enum',
+    enum: UserRole,
+    default: UserRole.USER,
+  })
+  role: UserRole;
 
   @Column({ type: 'int', default: 0 })
   credits: number;
