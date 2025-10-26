@@ -50,11 +50,11 @@ export class Booking {
   updatedAt: Date;
 
   // Relationships
-  @ManyToOne(() => User, (user) => user.bookings, { eager: true })
+  @ManyToOne(() => User, (user) => user.bookings)
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @ManyToOne(() => Class, (classEntity) => classEntity.bookings, { eager: true })
+  @ManyToOne(() => Class, (classEntity) => classEntity.bookings)
   @JoinColumn({ name: 'class_id' })
   class: Class;
 
